@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Our Panda Treasure Map 🐼🗺️</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+    <!-- Three.js (3D Graphic Engine) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GSAP for Smooth Physics and Choreography -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --pink-bg: #fff0f3;
+            --pink-main: #ff9ebb;
+            --pink-accent: #ff5e8e;
+            --pink-deep: #e83e74;
+            --pink-light: #ffe5ec;
+            --gold: #f39c12;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-dark: #2b2326;
+            --text-muted: #6e6166;
+            --shadow-card: 0 16px 40px rgba(232, 62, 116, 0.15);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at 50% 15%, #ffffff 0%, var(--pink-light) 65%, #ffd4de 100%);
+            color: var(--text-dark);
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        /* 3D WebGL Canvas Layer */
+        #webgl-canvas {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 2; pointer-events: auto;
+        }
+
+        /* Ambient Glow */
+        .ambient-layer {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none; z-index: 1;
+            background: 
+                radial-gradient(circle at 10% 25%, rgba(255, 182, 193, 0.45) 0%, transparent 40%),
+                radial-gradient(circle at 90% 75%, rgba(162, 210, 255, 0.35) 0%, transparent 40%);
+        }
+
+        /* Top Header Buttons */
+        .top-controls {
+            position: fixed; top: 20px; right: 20px; z-index: 100;
+            display: flex; gap: 10px;
+        }
+        .icon-btn {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: #ffffff; border: 2px solid var(--pink-accent);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.1); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; transition: transform 0.25s;
+        }
+        .icon-btn:hover { transform: scale(1.08); }
+        #sound-toggle.playing { animation: discSpin 6s linear infinite; }
+        @keyframes discSpin { 100% { transform: rotate(360deg); } }
+
+        /* Panda Speech Bubble */
+        #panda-speech {
+            position: fixed; bottom: 220px; right: 25px;
+            background: #ffffff; border: 3px solid var(--pink-accent);
+            border-radius: 24px; padding: 14px 20px; max-width: 260px;
+            box-shadow: var(--shadow-card); font-size: 14px; font-weight: 700;
+            color: var(--pink-deep); z-index: 99; pointer-events: none;
+            opacity: 0; transform: translateY(15px) scale(0.9);
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            line-height: 1.4;
+        }
+        #panda-speech::after {
+            content: ''; position: absolute; bottom: -12px; right: 60px;
+            border-width: 12px 12px 0 0; border-style: solid;
+            border-color: #ffffff transparent transparent transparent;
+        }
+
+        /* Screens Flow Container */
+        .screen {
+            display: none; min-height: 100vh; text-align: center;
+            padding: 30px 20px 220px; box-sizing: border-box;
+            position: relative; z-index: 10;
+            flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; transform: scale(0.96);
+            transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+        }
+        .screen.active {
+            display: flex; opacity: 1; transform: scale(1);
+            pointer-events: auto;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+            border: 2px solid #ffffff; border-radius: 34px;
+            padding: 32px 24px; max-width: 420px; width: 100%;
+            box-shadow: var(--shadow-card); position: relative;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--pink-accent), var(--pink-deep));
+            color: #ffffff; border: none; padding: 15px 32px;
+            border-radius: 50px; cursor: pointer; font-family: 'Quicksand', sans-serif;
+            font-weight: 700; font-size: 16px; margin: 10px 4px;
+            box-shadow: 0 8px 24px rgba(255, 94, 142, 0.35);
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            outline: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn:hover:not(:disabled) { transform: translateY(-2px) scale(1.03); }
+        .btn:active:not(:disabled) { transform: translateY(1px) scale(0.97); }
+        .btn:disabled { background: #d0c5cb; cursor: not-allowed; box-shadow: none; opacity: 0.7; }
+
+        .input-box {
+            width: 85%; padding: 13px 18px; border-radius: 18px;
+            border: 2px solid var(--pink-main); background: #ffffff;
+            font-family: inherit; font-size: 16px; font-weight: 600;
+            text-align: center; color: var(--text-dark); outline: none;
+            transition: all 0.25s ease;
+        }
+        .input-box:focus { border-color: var(--pink-deep); box-shadow: 0 0 0 4px rgba(255, 94, 142, 0.18); }
+
+        /* Countdown & Birthday Stats */
+        .wish-main { font-size: 26px; font-weight: 800; color: var(--pink-deep); margin: 16px 0 10px; line-height: 1.35; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 18px 0; }
+        .stat-item {
+            background: #ffffff; border: 1.5px solid var(--pink-main);
+            border-radius: 18px; padding: 12px 4px; box-shadow: 0 4px 14px rgba(255, 182, 193, 0.15);
+        }
+        .stat-num { font-size: 20px; font-weight: 800; color: var(--pink-deep); }
+        .stat-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 3px; }
+
+        /* Prank Runaway Badge */
+        #prank-container {
+            display: inline-flex; align-items: center; padding: 15px 28px;
+            background: #ffffff; border-radius: 40px; border: 3px solid var(--pink-accent);
+            box-shadow: 0 10px 28px rgba(255, 94, 142, 0.22); cursor: pointer;
+            transition: top 0.15s ease, left 0.15s ease;
+        }
+
+        /* Roadmap Trail */
+        .map-container {
+            position: relative; width: 100%; max-width: 370px; height: 660px;
+            margin: 15px auto; background: #faf9f6; border: 3.5px dashed var(--pink-main);
+            border-radius: 36px; box-shadow: inset 0 0 25px rgba(255, 182, 193, 0.2);
+            overflow: hidden;
+        }
+        .map-path-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .map-point {
+            position: absolute; width: 66px; height: 66px;
+            background: #ffffff; border: 3.5px solid #2d6a4f;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; cursor: pointer; z-index: 3;
+            transform: translate(-50%, -50%); transition: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+        }
+        .map-point:hover:not(.locked) { transform: translate(-50%, -50%) scale(1.18); }
+        .map-point.active-pulse { border-color: var(--pink-accent); animation: pulseMap 1.8s infinite; }
+        @keyframes pulseMap {
+            0% { box-shadow: 0 0 0 0 rgba(255, 94, 142, 0.6); }
+            70% { box-shadow: 0 0 0 16px rgba(255, 94, 142, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 94, 142, 0); }
+        }
+        .map-point.locked { border-color: #d2c8cd; background: #eee8eb; opacity: 0.6; cursor: not-allowed; }
+        .map-point.completed { background: #eaf6ec; border-color: #2d6a4f; }
+
+        /* Slider */
+        .slider-container {
+            position: relative; width: 100%; height: 240px;
+            background: #eee; border-radius: 20px; overflow: hidden; margin-bottom: 12px;
+        }
+        .slider-img { width: 100%; height: 100%; object-fit: cover; }
+        .nav-arrow {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.9); border: none;
+            width: 38px; height: 38px; border-radius: 50%;
+            cursor: pointer; font-size: 18px; z-index: 5;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .arrow-left { left: 8px; } .arrow-right { right: 8px; }
+
+        /* Keys HUD */
+        .keys-hud {
+            display: flex; justify-content: center; gap: 14px;
+            background: #ffffff; padding: 10px 18px; border-radius: 30px;
+            margin: 8px auto 14px; border: 2px dashed var(--pink-accent); width: fit-content;
+        }
+        .key-slot { font-size: 20px; filter: grayscale(1); opacity: 0.35; transition: 0.3s; }
+        .key-slot.obtained { filter: grayscale(0); opacity: 1; transform: scale(1.2); }
+
+        .treasure-box-art {
+            font-size: 90px; margin: 15px 0; cursor: pointer;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .treasure-box-art:hover { transform: scale(1.15) rotate(4deg); }
+
+        /* WebCam Viewport */
+        #camera-viewport {
+            width: 100%; height: 210px; border-radius: 20px;
+            background: #222; overflow: hidden; position: relative; margin: 14px 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #webcam-video { width: 100%; height: 100%; object-fit: cover; }
+        .reticle {
+            position: absolute; width: 120px; height: 120px;
+            border: 3px dashed var(--pink-accent); border-radius: 20px;
+            animation: pulseReticle 1.5s infinite; pointer-events: none;
+        }
+        @keyframes pulseReticle {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.08); opacity: 0.4; }
+        }
+
+        /* Proposal Hold */
+        #hold-container {
+            position: relative; width: 140px; height: 140px;
+            margin: 25px auto; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; touch-action: none;
+        }
+        .hold-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+        .ring-bg { fill: none; stroke: rgba(0, 119, 255, 0.12); stroke-width: 8; }
+        .ring-progress {
+            fill: none; stroke: #0077ff; stroke-width: 8;
+            stroke-dasharray: 377; stroke-dashoffset: 377; stroke-linecap: round;
+            transition: stroke-dashoffset 0.05s linear;
+        }
+
+        /* Final Actor Kiss Sequence */
+        #final-actor-wrap {
+            position: relative; width: 150px; height: 150px; margin: 0 auto;
+            transition: transform 1.8s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .shake { animation: shakeCard 0.35s ease-in-out; }
+        @keyframes shakeCard {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-layer"></div>
+
+    <!-- Top Header Controls -->
+    <div class="top-controls">
+        <button class="icon-btn" onclick="relockForTest()" title="Lock Screen (Test Mode)">🔒</button>
+        <button id="sound-toggle" class="icon-btn" onclick="toggleAudio()" title="Romantic Melody">🎵</button>
+    </div>
+
+    <!-- 3D Three.js Canvas -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Interactive Humanly Panda Speech Bubble -->
+    <div id="panda-speech">Hello my favorite human! 🐾</div>
+
+    <!-- ================= 0. BIRTHDAY LOCK GATE (ACTIVE BY DEFAULT) ================= -->
+    <section id="birthday-lock" class="screen active">
+        <div class="glass-card">
+            <div style="font-size: 64px; margin-bottom: 8px;">🔒🎂</div>
+            <h2 style="color: var(--pink-deep); margin: 0 0 6px;">Patience, My Panda! 🐼</h2>
+            <p style="color: var(--text-muted); font-size: 15px; margin: 0 0 16px;">
+                This special surprise unlocks on<br><b style="color:var(--pink-deep); font-size:16px;">October 28th at 12:00 AM</b>!
+            </p>
+            
+            <!-- Live Ticking Countdown -->
+            <div class="stats-grid">
+                <div class="stat-item"><div class="stat-num" id="lock-days">00</div><div class="stat-label">Days</div></div>
+                <div class="stat-item"><div class="stat-num" id="lock-hours">00</div><div class="stat-label">Hours</div></div>
+                <div class="stat-item"><div class="stat-num" id="lock-mins">00</div><div class="stat-label">Mins</div></div>
+                <div class="stat-item"><div class="stat-num" id="lock-secs">00</div><div class="stat-label">Secs</div></div>
+            </div>
+
+            <p style="font-size: 14px; font-weight: 700; color: var(--text-dark); margin: 18px 0 6px;">
+                Can't wait? Enter your secret password:
+            </p>
+            <input type="password" id="lock-password" class="input-box" placeholder="Enter password..." onkeydown="if(event.key==='Enter') verifyBirthdayLockPass()">
+            <p id="lock-error" style="color: #eb4d4b; font-size: 13px; font-weight: 700; display:none; margin: 8px 0 0;">Nice try, panda! 😜</p>
+            <br>
+            <button class="btn" style="margin-top: 10px;" onclick="verifyBirthdayLockPass()">Unlock Early 🗝️</button>
+        </div>
+    </section>
+
+    <!-- 1. WELCOME (Only shown after unlock) -->
+    <section id="welcome" class="screen">
+        <div style="font-size: 80px; cursor: pointer; margin-bottom: 15px;" onclick="startCinematicGermination()">
+            🎋
+        </div>
+        <h1 style="color: var(--pink-deep); font-size: 32px; font-weight: 800; margin: 0 0 10px;">Tap the bamboo seed!</h1>
+        <p style="color: var(--text-muted); font-size: 16px; margin: 0 0 25px;">Plant the seed of our story... something magical is waiting ✨</p>
+        <button class="btn" onclick="startCinematicGermination()">Plant Our Love Seed 🌱</button>
+    </section>
+
+    <!-- 1.5 CINEMATIC TREE GERMINATION & PANDA JUMP PAGE -->
+    <section id="tree-cinematic-page" class="screen">
+        <button id="tree-continue-btn" class="btn" style="display:none; position:fixed; bottom: 35px; z-index: 50; box-shadow: 0 10px 30px rgba(255, 94, 142, 0.5);" onclick="transitionToBirthday()">
+            Let's Celebrate Your Birthday! 🎂✨
+        </button>
+    </section>
+
+    <!-- 2. BIRTHDAY -->
+    <section id="birthday" class="screen">
+        <div class="glass-card">
+            <img src="https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExZWF0d2p6cnVpdjQxZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/EatwJZRUIv41G/giphy.gif" style="width:160px; border-radius:20px; box-shadow: 0 8px 20px rgba(0,0,0,0.08);">
+            <div class="wish-main">Happy Birthday Panda 💙🫂<br><span style="font-size: 16px; font-weight: 600; color: var(--text-muted);">Every single day with you feels like a gift!</span></div>
+            
+            <div class="stats-grid">
+                <div class="stat-item"><div class="stat-num">21</div><div class="stat-label">Years Old</div></div>
+                <div class="stat-item"><div class="stat-num">7,670</div><div class="stat-label">Days</div></div>
+                <div class="stat-item"><div class="stat-num">184,080</div><div class="stat-label">Hours</div></div>
+                <div class="stat-item"><div class="stat-num">11,044,800</div><div class="stat-label">Minutes...</div></div>
+            </div>
+            
+            <button id="explore-btn" class="btn" style="display:none;" onclick="showPage('pre-journey')">Explore Our Story ✨</button>
+        </div>
+    </section>
+
+    <!-- 3. TRANSITION -->
+    <section id="pre-journey" class="screen">
+        <div class="glass-card">
+            <div style="font-size: 55px; margin-bottom: 15px;">🐾</div>
+            <h2 style="font-size: 24px; line-height: 1.4; color: var(--text-dark);">But wait... let's see how he became your <b style="color: #0077ff;">Imsa💙</b></h2>
+            <button class="btn" onclick="showPage('challenge')">Let's see! 🐾</button>
+        </div>
+    </section>
+
+    <!-- 4. CHALLENGE PRANK -->
+    <section id="challenge" class="screen">
+        <div class="glass-card" style="overflow: visible;">
+            <p id="prank-msg" style="font-size: 18px; font-weight: 700; margin-bottom: 25px;">Check the box to prove you are a panda!</p>
+            <div id="prank-container" onmouseover="doPrank()" ontouchstart="doPrank()">
+                <label style="cursor: pointer; font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; color: var(--pink-deep);">
+                    <input type="checkbox" id="isPanda" onchange="checkPandaStatus()" style="width: 22px; height: 22px; accent-color: var(--pink-deep);"> I am panda 🐼
+                </label>
+            </div>
+            <br><button id="challenge-next" class="btn" disabled style="margin-top: 25px;" onclick="showPage('init-quiz')">Proceed...</button>
+        </div>
+    </section>
+
+    <!-- 5. VERIFICATION QUIZ -->
+    <section id="init-quiz" class="screen">
+        <div class="glass-card" id="iq-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 id="iq-title" style="margin: 0; color: var(--pink-deep); font-size: 16px; text-transform: uppercase;">Verification</h3>
+                <span id="iq-progress" style="font-size: 13px; font-weight: 700; color: var(--text-muted);">1 / 5</span>
+            </div>
+            <p id="iq-text" style="font-size: 18px; font-weight: 700; min-height: 50px; margin: 15px 0 20px;"></p>
+            <input type="text" id="iq-ans" class="input-box" placeholder="Your answer..." onkeydown="if(event.key==='Enter') checkInitialQuiz()">
+            <p id="iq-error" style="color: #eb4d4b; font-size: 14px; font-weight: 700; display:none; margin: 10px 0 0;">Try again panda 🐼</p>
+            <br><button class="btn" style="margin-top: 15px;" onclick="checkInitialQuiz()">Submit</button>
+        </div>
+    </section>
+
+    <!-- 6. THE TREASURE MAP -->
+    <section id="roadmap" class="screen">
+        <h1 style="color: var(--pink-deep); font-size: 26px; margin: 0 0 4px;">The Bamboo Map 🎋</h1>
+        <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 6px;">Follow the trail to find the treasure!</p>
+        
+        <!-- Key Collection Status HUD -->
+        <div class="keys-hud">
+            <span class="key-slot" id="hud-key-1" title="Golden Key 1">🗝️</span>
+            <span class="key-slot" id="hud-key-2" title="Golden Key 2">🗝️</span>
+            <span class="key-slot" id="hud-key-3" title="Golden Key 3 (Panda's Key)">🗝️</span>
+        </div>
+
+        <div class="map-container">
+            <svg class="map-path-svg" viewBox="0 0 370 660">
+                <path d="M 65,45 Q 285,85 285,130 T 70,225 T 285,320 T 75,415 T 280,510 T 65,585" 
+                      fill="none" stroke="#ffb6c1" stroke-width="6" stroke-dasharray="10 8" stroke-linecap="round"/>
+            </svg>
+            <div id="map-points-container"></div>
+            <!-- BUTTON AFTER MAP COMPLETION: OPENS TREASURE QUEST -->
+            <button id="travel-btn" class="btn" style="display:none; position:absolute; bottom: 15px; left:50%; transform:translateX(-50%); width: 85%; z-index: 10;" onclick="showPage('treasure-quest')">Find The Treasure 🎁🗝️</button>
+        </div>
+    </section>
+
+    <!-- 6.5 JOURNEY DETAIL -->
+    <section id="journey-detail" class="screen">
+        <div class="glass-card" id="detail-card">
+            <h3 id="j-title" style="color: var(--pink-deep); margin: 0 0 12px;"></h3>
+            <div class="slider-container">
+                <button class="nav-arrow arrow-left" onclick="changeImage(-1)">❮</button>
+                <img id="j-img" src="" class="slider-img" alt="Memory Photo">
+                <button class="nav-arrow arrow-right" onclick="changeImage(1)">❯</button>
+            </div>
+            <button class="btn" style="font-size:12px; padding: 8px 18px; background:#6c7a89; box-shadow: none; margin: 0 auto 10px;" onclick="downloadImage()">Download Photo 📥</button>
+            <p id="j-text" style="font-size:14px; line-height: 1.5; color: var(--text-muted); background: #fdf6f8; padding: 12px; border-radius: 16px;"></p>
+            
+            <div id="j-quiz-box">
+                <p style="font-size: 14px; margin: 8px 0;"><b>Unlock Question:</b> <span id="j-quest" style="color: var(--pink-deep);"></span></p>
+                <input type="text" id="j-ans" class="input-box" placeholder="Your answer..." onkeydown="if(event.key==='Enter') finishJourneyPoint()">
+            </div>
+
+            <div style="margin-top: 15px; display: flex; justify-content: center; gap: 8px;">
+                <button class="btn" style="background:#95a5a6; box-shadow: none;" onclick="showPage('roadmap')">Map</button>
+                <button id="j-unlock-btn" class="btn" onclick="finishJourneyPoint()">Unlock</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. THE TREASURE BOX & CAMERA SIGN VERIFICATION -->
+    <section id="treasure-quest" class="screen">
+        <div class="glass-card">
+            <h2 style="color: var(--pink-deep); margin: 0 0 6px;">The Secret Treasure Chest 🎁</h2>
+            <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 15px;">It takes 3 Golden Keys to unlock what lies within!</p>
+
+            <div class="keys-hud" style="margin-bottom: 15px;">
+                <span class="key-slot" id="quest-key-1">🗝️ Key 1</span>
+                <span class="key-slot" id="quest-key-2">🗝️ Key 2</span>
+                <span class="key-slot" id="quest-key-3">🔒 Key 3</span>
+            </div>
+
+            <!-- Box unopened -->
+            <div id="chest-closed-view">
+                <div class="treasure-box-art" onclick="attemptOpenTreasure()">🎁</div>
+
+                <!-- Ask panda for key 3 -->
+                <div id="ask-panda-section">
+                    <p style="font-size: 14px; color: var(--pink-deep); font-weight: 700;">Key #3 is held safely by the Panda! 🐾</p>
+                    <button class="btn" onclick="triggerPandaKeyRequest()">Ask Panda for Key #3 🐼</button>
+                </div>
+
+                <!-- Camera Love Sign Scanner -->
+                <div id="camera-section" style="display:none;">
+                    <p style="font-size: 14px; font-weight: 700; color: var(--pink-deep);">Show any hand sign of love! 🫶 🫰 🤞 🤌 🤏</p>
+                    <div id="camera-viewport">
+                        <video id="webcam-video" autoplay playsinline></video>
+                        <div class="reticle"></div>
+                    </div>
+                    <button class="btn" onclick="verifyLoveSignWithPanda()">Capture Love Sign 📸</button>
+                    <button class="btn" style="background:#95a5a6; font-size: 12px; padding: 8px 16px;" onclick="skipCameraAndGrantKey()">Camera issue? Verify anyway 💖</button>
+                </div>
+
+                <!-- Ready to open button -->
+                <div id="open-box-section" style="display:none; margin-top: 15px;">
+                    <button class="btn" style="background: linear-gradient(135deg, #f39c12, #e67e22);" onclick="openTreasureChest()">Open The Treasure Box 🗝️✨</button>
+                </div>
+            </div>
+
+            <!-- Box opened: The Treasure is HIM! -->
+            <div id="chest-opened-view" style="display:none; animation: fadeIn 0.8s forwards;">
+                <div style="font-size: 70px; margin: 10px 0;">✨💖✨</div>
+                <h2 style="color: var(--pink-deep); margin: 0 0 8px;">The Treasure You Seek...</h2>
+                <h1 style="color: #0077ff; font-size: 28px; margin: 0 0 15px;">...is HIM! 💙</h1>
+
+                <div style="width: 220px; height: 220px; margin: 0 auto 15px; border-radius: 24px; overflow: hidden; border: 4px solid var(--pink-accent); box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
+                    <!-- Replace with his photo! -->
+                    <img src="https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=500&q=80" style="width:100%; height:100%; object-fit: cover;" alt="Your Greatest Treasure">
+                </div>
+                <p style="font-size: 14px; color: var(--text-muted); font-weight: 600;">Your forever protector, your favorite boy, your Imsa 💙</p>
+                
+                <button class="btn" style="margin-top: 15px;" onclick="showPage('proposal')">Travel Together & Be Mine 🫴</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 8. PROPOSAL -->
+    <section id="proposal" class="screen">
+        <div class="glass-card">
+            <h1 style="font-size: 24px; font-weight: 800; margin: 0 0 6px;">You have my whole heart for my whole life.</h1>
+            <h2 style="color: var(--pink-deep); font-size: 22px; margin: 0 0 20px;">Be mine? 🫴</h2>
+            <div id="hold-container" onmousedown="startHold()" onmouseup="endHold()" onmouseleave="endHold()" ontouchstart="startHold(event)" ontouchend="endHold()" ontouchcancel="endHold()">
+                <svg class="hold-svg" viewBox="0 0 140 140">
+                    <circle class="ring-bg" cx="70" cy="70" r="60"/>
+                    <circle class="ring-progress" id="hold-progress" cx="70" cy="70" r="60"/>
+                </svg>
+                <div style="font-size:60px; line-height:140px; text-align:center;">🫳</div>
+            </div>
+            <p id="hold-text" style="font-size: 14px; color: var(--text-muted); font-weight: 600;">Long press for 5 seconds...</p>
+            <div id="agreement-msg" style="display:none;">
+                <h1 style="color:#2d6a4f; font-size: 28px; margin: 10px 0;">✅ Agreed!</h1>
+                <button class="btn" onclick="startFinalSequence()">Look at me...</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 9. FINAL KISS -->
+    <section id="final" class="screen">
+        <div id="final-actor-wrap">
+            <svg id="final-actor-svg" viewBox="0 0 120 120" width="100%" height="100%">
+                <circle cx="60" cy="60" r="48" fill="#ffeaa7"/>
+                <path d="M20 50 C20 20 100 20 100 50 C90 35 70 30 60 30 C45 30 30 35 20 50 Z" fill="#2d3436"/>
+                <circle id="blush-l" cx="35" cy="70" r="9" fill="#ff7675" opacity="0.3"/>
+                <circle id="blush-r" cx="85" cy="70" r="9" fill="#ff7675" opacity="0.3"/>
+                <g id="actor-face">
+                    <circle cx="42" cy="58" r="5" fill="#2d3436"/>
+                    <circle cx="78" cy="58" r="5" fill="#2d3436"/>
+                    <path d="M 52,75 Q 60,82 68,75" fill="none" stroke="#2d3436" stroke-width="3.5" stroke-linecap="round"/>
+                </g>
+            </svg>
+        </div>
+        <h1 id="final-text" style="color: var(--pink-deep); font-size: 32px; font-weight: 800; min-height: 45px; margin-top: 25px;">...</h1>
+    </section>
+
+    <script>
+        /* ================= 0. 28th October Birthday Lock Engine ================= */
+        const LOCK_PASSWORD = "kuttyma123";
+        let lockTimerInterval = null;
+
+        function getTargetUnlockDate() {
+            const now = new Date();
+            let targetYear = now.getFullYear();
+            // Month 9 is October (0-indexed: Jan=0, Oct=9). Date 28 at 00:00:00
+            let unlockDate = new Date(targetYear, 9, 28, 0, 0, 0);
+
+            // If Oct 28 of this year has already passed by more than 24h, target the upcoming year's Oct 28
+            if (now.getTime() > unlockDate.getTime() + (24 * 60 * 60 * 1000)) {
+                unlockDate = new Date(targetYear + 1, 9, 28, 0, 0, 0);
+            }
+            return unlockDate;
+        }
+
+        function checkBirthdayLock() {
+            const now = new Date();
+            const unlockDate = getTargetUnlockDate();
+            const isEarlyUnlocked = sessionStorage.getItem('panda_early_unlock') === 'true';
+
+            // Check if current moment is already 12:00 AM of October 28 (or later within the birthday)
+            const isBirthdayArrived = now >= unlockDate && (now.getTime() - unlockDate.getTime()) < (24 * 60 * 60 * 1000);
+
+            if (isBirthdayArrived || isEarlyUnlocked) {
+                showPage('welcome');
+            } else {
+                showPage('birthday-lock');
+                updateLockCountdown();
+                if (lockTimerInterval) clearInterval(lockTimerInterval);
+                lockTimerInterval = setInterval(updateLockCountdown, 1000);
+            }
+        }
+
+        function updateLockCountdown() {
+            const now = new Date();
+            const target = getTargetUnlockDate();
+            const diff = target - now;
+
+            if (diff <= 0) {
+                clearInterval(lockTimerInterval);
+                showPage('welcome');
+                return;
+            }
+
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            const m = Math.floor((diff / (1000 * 60)) % 60);
+            const s = Math.floor((diff / 1000) % 60);
+
+            const elD = document.getElementById('lock-days');
+            const elH = document.getElementById('lock-hours');
+            const elM = document.getElementById('lock-mins');
+            const elS = document.getElementById('lock-secs');
+
+            if (elD) elD.innerText = d.toString().padStart(2, '0');
+            if (elH) elH.innerText = h.toString().padStart(2, '0');
+            if (elM) elM.innerText = m.toString().padStart(2, '0');
+            if (elS) elS.innerText = s.toString().padStart(2, '0');
+        }
+
+        function verifyBirthdayLockPass() {
+            const input = document.getElementById('lock-password').value.trim();
+            if (input.toLowerCase() === LOCK_PASSWORD.toLowerCase()) {
+                sessionStorage.setItem('panda_early_unlock', 'true');
+                if (lockTimerInterval) clearInterval(lockTimerInterval);
+                confetti({ particleCount: 70, spread: 80 });
+                showPage('welcome');
+            } else {
+                document.getElementById('lock-error').style.display = 'block';
+                const card = document.querySelector('#birthday-lock .glass-card');
+                if (card) {
+                    card.classList.add('shake');
+                    setTimeout(() => card.classList.remove('shake'), 400);
+                }
+            }
+        }
+
+        function relockForTest() {
+            sessionStorage.removeItem('panda_early_unlock');
+            document.getElementById('lock-password').value = "";
+            document.getElementById('lock-error').style.display = 'none';
+            checkBirthdayLock();
+        }
+
+        /* ================= 1. Interactive Panda Text Dialogue ================= */
+        function speakHumanPanda(text, callback) {
+            const bubble = document.getElementById('panda-speech');
+            bubble.innerText = text;
+            bubble.style.opacity = '1';
+            bubble.style.transform = 'translateY(0) scale(1)';
+
+            if (pandaHead) {
+                gsap.to(pandaHead.rotation, { z: 0.1, duration: 0.2, yoyo: true, repeat: 3 });
+            }
+
+            clearTimeout(window.bubbleTimer);
+            const displayTime = Math.min(Math.max(text.length * 55, 2200), 4000);
+            window.bubbleTimer = setTimeout(() => {
+                bubble.style.opacity = '0';
+                bubble.style.transform = 'translateY(15px) scale(0.9)';
+                if (callback) callback();
+            }, displayTime);
+        }
+
+        /* Romantic Procedural Piano Chords */
+        let audioCtx, musicPlaying = false, musicTimer = null;
+        const chords = [
+            [261.63, 329.63, 392.00, 523.25], // C major
+            [220.00, 261.63, 329.63, 440.00], // A minor
+            [174.61, 220.00, 261.63, 349.23], // F major
+            [196.00, 246.94, 293.66, 392.00]  // G major
+        ];
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSoftTone(freq, time, dur = 1.2) {
+            if (!audioCtx || !musicPlaying) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, time);
+
+            gain.gain.setValueAtTime(0.0001, time);
+            gain.gain.linearRampToValueAtTime(0.038, time + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(time);
+            osc.stop(time + dur);
+        }
+
+        function startRomanticMusic() {
+            initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            musicPlaying = true;
+            document.getElementById('sound-toggle').classList.add('playing');
+
+            let chordIndex = 0;
+            function loop() {
+                if (!musicPlaying) return;
+                const now = audioCtx.currentTime;
+                const currentChord = chords[chordIndex % chords.length];
+                currentChord.forEach((note, idx) => {
+                    playSoftTone(note, now + idx * 0.45, 2.0);
+                });
+                chordIndex++;
+                musicTimer = setTimeout(loop, 2200);
+            }
+            loop();
+        }
+
+        function toggleAudio() {
+            if (musicPlaying) {
+                musicPlaying = false;
+                clearTimeout(musicTimer);
+                document.getElementById('sound-toggle').classList.remove('playing');
+            } else {
+                startRomanticMusic();
+                speakHumanPanda("The lovely music is playing! 🎵 Enjoy our journey!");
+            }
+        }
+
+        /* ================= 2. Three.js: Plush Panda Holding Cupcake ================= */
+        let scene, camera, renderer, raycaster, mouse;
+        let bambooForestGroup, darkBlueHearts = [], sparkleParticles;
+        let plushPanda, pandaHead, eyeL, eyeR, legL, legR, cupcakeGroup;
+        let isWaddling = false, isCompanionMode = false;
+
+        function init3DWorld() {
+            const canvas = document.getElementById('webgl-canvas');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.4, 9.5);
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.92);
+            scene.add(ambient);
+            const keySun = new THREE.DirectionalLight(0xfff5f0, 0.85);
+            keySun.position.set(5, 12, 7);
+            scene.add(keySun);
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            buildRealisticBotanicalBamboo();
+            buildPhotoExactPlushPandaWithCupcake();
+
+            plushPanda.visible = false;
+
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('touchmove', onTouchMove);
+            window.addEventListener('click', onPandaPlushTap);
+
+            renderLoop();
+        }
+
+        function buildRealisticBotanicalBamboo() {
+            bambooForestGroup = new THREE.Group();
+            scene.add(bambooForestGroup);
+
+            const caneMat = new THREE.MeshToonMaterial({ color: 0x386641 });
+            const nodeRingMat = new THREE.MeshToonMaterial({ color: 0x1b4332 });
+            const leafMat = new THREE.MeshToonMaterial({ color: 0x6a994e, side: THREE.DoubleSide });
+
+            const darkBlueHeartMat = new THREE.MeshToonMaterial({
+                color: 0x0044ff,
+                emissive: 0x0022aa,
+                emissiveIntensity: 0.45
+            });
+
+            const heartShape = new THREE.Shape();
+            heartShape.moveTo(0, 0.35);
+            heartShape.bezierCurveTo(0, 0.65, 0.45, 0.65, 0.45, 0.35);
+            heartShape.bezierCurveTo(0.45, 0.1, 0.2, -0.2, 0, -0.45);
+            heartShape.bezierCurveTo(-0.2, -0.2, -0.45, 0.1, -0.45, 0.35);
+            heartShape.bezierCurveTo(-0.45, 0.65, 0, 0.65, 0, 0.35);
+
+            const heartExtrude = new THREE.ExtrudeGeometry(heartShape, {
+                depth: 0.18, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.08, bevelThickness: 0.08
+            });
+            heartExtrude.center();
+
+            const totalSegments = 10;
+            const segH = 0.8;
+            for (let i = 0; i < totalSegments; i++) {
+                const segMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, segH, 20), caneMat);
+                segMesh.position.y = (i * segH) - 2.8;
+                bambooForestGroup.add(segMesh);
+
+                const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.05, 12, 24), nodeRingMat);
+                ringMesh.rotateX(Math.PI / 2);
+                ringMesh.position.y = segMesh.position.y + (segH / 2);
+                bambooForestGroup.add(ringMesh);
+            }
+
+            const mainBranch = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 2.5, 16), caneMat);
+            mainBranch.rotateZ(Math.PI / 2.3);
+            mainBranch.position.set(-1.05, 1.85, 0.2);
+            bambooForestGroup.add(mainBranch);
+
+            const heartCoords = [
+                [-1.6, 1.3, 0.4],
+                [-0.8, 1.1, 0.6],
+                [1.4, 1.8, 0.3],
+                [2.0, 1.5, 0.4],
+                [-0.2, 3.2, 0.5]
+            ];
+            heartCoords.forEach(pos => {
+                const hMesh = new THREE.Mesh(heartExtrude, darkBlueHeartMat);
+                hMesh.scale.set(0.65, 0.65, 0.65);
+                hMesh.position.set(pos[0], pos[1], pos[2]);
+                hMesh.rotation.set(0, 0, 0);
+                bambooForestGroup.add(hMesh);
+                darkBlueHearts.push(hMesh);
+            });
+
+            const sparkleGeo = new THREE.BufferGeometry();
+            const sparkleCount = 60;
+            const sparklePos = new Float32Array(sparkleCount * 3);
+            for (let i = 0; i < sparkleCount * 3; i += 3) {
+                sparklePos[i] = (Math.random() - 0.5) * 4.5;
+                sparklePos[i + 1] = Math.random() * 3.5 + 0.5;
+                sparklePos[i + 2] = (Math.random() - 0.5) * 2;
+            }
+            sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePos, 3));
+            sparkleParticles = new THREE.Points(sparkleGeo, new THREE.PointsMaterial({ color: 0x90e0ef, size: 0.12, transparent: true, opacity: 0.85 }));
+            bambooForestGroup.add(sparkleParticles);
+
+            bambooForestGroup.visible = false;
+        }
+
+        function buildPhotoExactPlushPandaWithCupcake() {
+            plushPanda = new THREE.Group();
+            scene.add(plushPanda);
+
+            const plushWhite = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.05 });
+            const plushBlack = new THREE.MeshStandardMaterial({ color: 0x18181c, roughness: 0.88, metalness: 0.05 });
+            const plushPinkPads = new THREE.MeshToonMaterial({ color: 0xff8fa3 });
+            const glossyEye = new THREE.MeshStandardMaterial({ color: 0x0a0a0d, roughness: 0.1, metalness: 0.9 });
+            const eyeShine = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+            const bodyGeo = new THREE.SphereGeometry(0.92, 32, 32);
+            bodyGeo.scale(1.08, 1.15, 0.98);
+            const body = new THREE.Mesh(bodyGeo, plushWhite);
+            body.position.y = -0.35;
+            plushPanda.add(body);
+
+            pandaHead = new THREE.Group();
+            const headGeo = new THREE.SphereGeometry(0.96, 32, 32);
+            headGeo.scale(1.15, 1.02, 1.06);
+            const headMesh = new THREE.Mesh(headGeo, plushWhite);
+            pandaHead.add(headMesh);
+
+            const earGeo = new THREE.SphereGeometry(0.33, 24, 24);
+            const earL = new THREE.Mesh(earGeo, plushBlack);
+            earL.position.set(-0.85, 0.85, -0.05);
+            const earR = new THREE.Mesh(earGeo, plushBlack);
+            earR.position.set(0.85, 0.85, -0.05);
+            pandaHead.add(earL, earR);
+
+            const patchGeo = new THREE.SphereGeometry(0.28, 20, 20);
+            patchGeo.scale(1, 1.25, 0.45);
+            const patchL = new THREE.Mesh(patchGeo, plushBlack);
+            patchL.position.set(-0.45, 0.14, 0.88);
+            patchL.rotation.z = 0.28;
+            const patchR = new THREE.Mesh(patchGeo, plushBlack);
+            patchR.position.set(0.45, 0.14, 0.88);
+            patchR.rotation.z = -0.28;
+            pandaHead.add(patchL, patchR);
+
+            const eyeGeo = new THREE.SphereGeometry(0.13, 20, 20);
+            eyeL = new THREE.Mesh(eyeGeo, glossyEye);
+            eyeL.position.set(-0.4, 0.16, 0.99);
+            eyeR = new THREE.Mesh(eyeGeo, glossyEye);
+            eyeR.position.set(0.4, 0.16, 0.99);
+
+            const shineGeo = new THREE.SphereGeometry(0.045, 16, 16);
+            const sL = new THREE.Mesh(shineGeo, eyeShine);
+            sL.position.set(-0.03, 0.04, 0.1);
+            eyeL.add(sL);
+            const sR = new THREE.Mesh(shineGeo, eyeShine);
+            sR.position.set(-0.03, 0.04, 0.1);
+            eyeR.add(sR);
+            pandaHead.add(eyeL, eyeR);
+
+            const snoutGeo = new THREE.SphereGeometry(0.28, 24, 24);
+            snoutGeo.scale(1.25, 0.85, 0.8);
+            const snout = new THREE.Mesh(snoutGeo, plushWhite);
+            snout.position.set(0, -0.16, 0.98);
+            pandaHead.add(snout);
+
+            const noseMesh = new THREE.Mesh(new THREE.SphereGeometry(0.095, 16, 16), plushBlack);
+            noseMesh.scale.set(1.3, 0.8, 0.8);
+            noseMesh.position.set(0, -0.08, 1.12);
+            pandaHead.add(noseMesh);
+
+            pandaHead.position.y = 0.95;
+            plushPanda.add(pandaHead);
+
+            const armGeo = new THREE.SphereGeometry(0.34, 24, 24);
+            armGeo.scale(0.85, 1.45, 0.9);
+            const armL = new THREE.Mesh(armGeo, plushBlack);
+            armL.position.set(-0.95, -0.25, 0.4);
+            armL.rotation.set(0.6, 0.4, -0.4);
+
+            const armR = new THREE.Mesh(armGeo, plushBlack);
+            armR.position.set(0.95, -0.25, 0.4);
+            armR.rotation.set(0.6, -0.4, 0.4);
+            plushPanda.add(armL, armR);
+
+            const legGeo = new THREE.SphereGeometry(0.38, 24, 24);
+            legGeo.scale(1.05, 1.0, 1.35);
+
+            legL = new THREE.Mesh(legGeo, plushBlack);
+            legL.position.set(-0.7, -1.05, 0.6);
+            legL.rotation.x = -0.3;
+
+            const padL = new THREE.Mesh(new THREE.CircleGeometry(0.14, 20), plushPinkPads);
+            padL.position.set(0, -0.05, 0.52);
+            legL.add(padL);
+            for (let t = 0; t < 4; t++) {
+                const toePad = new THREE.Mesh(new THREE.CircleGeometry(0.045, 14), plushPinkPads);
+                toePad.position.set(-0.12 + t * 0.08, 0.16, 0.52);
+                legL.add(toePad);
+            }
+
+            legR = new THREE.Mesh(legGeo, plushBlack);
+            legR.position.set(0.7, -1.05, 0.6);
+            legR.rotation.x = -0.3;
+
+            const padR = new THREE.Mesh(new THREE.CircleGeometry(0.14, 20), plushPinkPads);
+            padR.position.set(0, -0.05, 0.52);
+            legR.add(padR);
+            for (let t = 0; t < 4; t++) {
+                const toePad = new THREE.Mesh(new THREE.CircleGeometry(0.045, 14), plushPinkPads);
+                toePad.position.set(-0.12 + t * 0.08, 0.16, 0.52);
+                legR.add(toePad);
+            }
+
+            plushPanda.add(legL, legR);
+
+            // Cupcake
+            cupcakeGroup = new THREE.Group();
+            const cakeBase = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.38, 0.5, 24), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }));
+            cakeBase.position.y = -0.15;
+            cupcakeGroup.add(cakeBase);
+
+            const cakeFrosting = new THREE.Mesh(new THREE.SphereGeometry(0.52, 24, 24), new THREE.MeshStandardMaterial({ color: 0xffb3c6, roughness: 0.95 }));
+            cakeFrosting.scale.set(1.05, 0.75, 1.05);
+            cakeFrosting.position.y = 0.15;
+            cupcakeGroup.add(cakeFrosting);
+
+            const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 16), new THREE.MeshToonMaterial({ color: 0xffccd5 }));
+            candle.position.set(0, 0.45, 0.05);
+            candle.rotation.z = 0.15;
+            cupcakeGroup.add(candle);
+
+            const flame = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffb703 }));
+            flame.scale.set(0.8, 1.4, 0.8);
+            flame.position.set(0, 0.22, 0);
+            candle.add(flame);
+
+            cupcakeGroup.position.set(0, -0.3, 0.72);
+            cupcakeGroup.scale.set(0.9, 0.9, 0.9);
+            plushPanda.add(cupcakeGroup);
+        }
+
+        let clock = new THREE.Clock();
+        function renderLoop() {
+            requestAnimationFrame(renderLoop);
+            const t = clock.getElapsedTime();
+
+            if (darkBlueHearts.length > 0) {
+                const heartbeat = 1.0 + Math.pow(Math.sin(t * 3.8), 10) * 0.18;
+                darkBlueHearts.forEach(h => h.scale.set(0.65 * heartbeat, 0.65 * heartbeat, 0.65 * heartbeat));
+            }
+            if (sparkleParticles) sparkleParticles.rotation.y = t * 0.25;
+
+            if (plushPanda && plushPanda.visible) {
+                if (isWaddling) {
+                    plushPanda.rotation.z = Math.sin(t * 6.5) * 0.12;
+                    legL.rotation.x = -0.3 + Math.sin(t * 6.5) * 0.2;
+                    legR.rotation.x = -0.3 - Math.sin(t * 6.5) * 0.2;
+                    cupcakeGroup.position.y = -0.3 + Math.abs(Math.sin(t * 6.5)) * 0.06;
+                } else if (isCompanionMode) {
+                    plushPanda.position.y = -1.6 + Math.sin(t * 3) * 0.06;
+                    pandaHead.rotation.y = THREE.MathUtils.lerp(pandaHead.rotation.y, mouse.x * 0.42, 0.1);
+                    pandaHead.rotation.x = THREE.MathUtils.lerp(pandaHead.rotation.x, -mouse.y * 0.28, 0.1);
+                }
+
+                const blink = Math.sin(t * 2.2);
+                if (blink > 0.96) { eyeL.scale.y = 0.1; eyeR.scale.y = 0.1; }
+                else { eyeL.scale.y = 1; eyeR.scale.y = 1; }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onMouseMove(e) {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onTouchMove(e) {
+            if (e.touches.length > 0) {
+                mouse.x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onPandaPlushTap() {
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(plushPanda.children, true);
+            if (hits.length > 0) {
+                gsap.to(plushPanda.position, { y: "+=0.35", yoyo: true, repeat: 1, duration: 0.22 });
+                const warmReactions = [
+                    "Aww, don't squish my cupcake! It's for your 21st birthday! 🧁",
+                    "Hey birthday girl! You look so pretty today! 💙",
+                    "Give me a warm hug first! I'm your cuddliest Panda!",
+                    "Look at my little pink paws! Aren't we the perfect team?"
+                ];
+                speakHumanPanda(warmReactions[Math.floor(Math.random() * warmReactions.length)]);
+            }
+        }
+
+        /* ================= 3. The Tree Germination & Plush Panda Jump Sequence ================= */
+        let hasTransitionedToBirthday = false;
+
+        function startCinematicGermination() {
+            startRomanticMusic();
+            hasTransitionedToBirthday = false;
+            showPage('tree-cinematic-page');
+
+            bambooForestGroup.visible = true;
+            bambooForestGroup.scale.set(0.01, 0.01, 0.01);
+
+            gsap.to(bambooForestGroup.scale, {
+                x: 1, y: 1, z: 1,
+                duration: 2.0,
+                ease: "elastic.out(1, 0.75)",
+                onComplete: () => {
+                    plushPanda.visible = true;
+                    plushPanda.position.set(-1.1, 2.6, 0.45);
+                    plushPanda.rotation.set(0.1, 0.4, 0.05);
+                    plushPanda.scale.set(0.68, 0.68, 0.68);
+
+                    speakHumanPanda("Look! Our tree sprouted! Bringing your cupcake down!");
+                    setTimeout(executePlushPandaJump, 2200);
+                }
+            });
+        }
+
+        function executePlushPandaJump() {
+            const jumpTimeline = gsap.timeline();
+            jumpTimeline.to(plushPanda.position, { x: 0, y: 3.6, z: 1.6, duration: 0.45, ease: "power2.out" })
+            .to(plushPanda.rotation, { x: Math.PI * 2, duration: 0.6, ease: "power1.inOut" }, "<")
+            .to(plushPanda.position, { x: 0, y: -0.85, z: 2.4, duration: 0.55, ease: "bounce.out", onComplete: () => {
+                confetti({ particleCount: 90, spread: 80 });
+                waddleToHerAndIntroduce();
+            }});
+        }
+
+        function waddleToHerAndIntroduce() {
+            isWaddling = true;
+            gsap.to(plushPanda.position, {
+                z: 2.7, duration: 1.2, ease: "power1.inOut",
+                onComplete: () => {
+                    isWaddling = false;
+                    plushPanda.rotation.z = 0;
+                    legL.rotation.x = -0.3; legR.rotation.x = -0.3;
+
+                    speakHumanPanda("Oof, safe landing! Happy 21st Birthday, my Panda! Look, I baked this little cupcake just for you! 🧁");
+
+                    // Show continue button so she can tap whenever she wants
+                    const cBtn = document.getElementById('tree-continue-btn');
+                    if (cBtn) {
+                        cBtn.style.display = 'inline-flex';
+                        gsap.fromTo(cBtn, { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.7)" });
+                    }
+
+                    // Auto transition after 3.8s
+                    setTimeout(() => {
+                        transitionToBirthday();
+                    }, 3800);
+                }
+            });
+        }
+
+        function transitionToBirthday() {
+            if (hasTransitionedToBirthday) return;
+            hasTransitionedToBirthday = true;
+
+            const cBtn = document.getElementById('tree-continue-btn');
+            if (cBtn) cBtn.style.display = 'none';
+
+            if (bambooForestGroup) {
+                gsap.to(bambooForestGroup.position, { y: -14, duration: 1.0, ease: "power2.in" });
+            }
+            if (plushPanda) {
+                gsap.to(plushPanda.position, {
+                    x: 1.85, y: -1.6, z: 0.5, duration: 1.2, ease: "power2.out",
+                    onComplete: () => {
+                        isCompanionMode = true;
+                        isWaddling = false;
+                        showPage('birthday');
+                    }
+                });
+            } else {
+                showPage('birthday');
+            }
+        }
+
+        /* ================= 4. Page Routing & Flow ================= */
+        function showPage(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            const target = document.getElementById(id);
+            if (target) target.classList.add('active');
+
+            if (id === 'birthday') {
+                speakHumanPanda("Can you believe it? 7,670 whole days you've been lighting up this world... every single day with you is my gift! 💙");
+                setTimeout(() => document.getElementById('explore-btn').style.display = 'inline-flex', 4000);
+            } else if (id === 'pre-journey') {
+                speakHumanPanda("Hehe, you know I wasn't always this smooth... let's see how this crazy boy became your Imsa!");
+            } else if (id === 'challenge') {
+                speakHumanPanda("Catch that runaway box! Prove you are my genuine Panda! 😜");
+            } else if (id === 'init-quiz') {
+                loadInitialQuiz();
+                speakHumanPanda("Quick memory check! Don't you dare forget our story!");
+            } else if (id === 'roadmap') {
+                renderRoadmap();
+                speakHumanPanda("Here is our Bamboo Map! Look out for 2 golden keys hidden along the trail!");
+            } else if (id === 'treasure-quest') {
+                updateQuestHUD();
+            } else if (id === 'proposal') {
+                speakHumanPanda("Hold my hand... tight... don't let go for 5 seconds!");
+            }
+        }
+
+        /* ================= 5. Prank Logic ================= */
+        let jumpCount = 0, prankFinished = false;
+        function doPrank() {
+            if (prankFinished) return;
+            const el = document.getElementById('prank-container');
+            const msg = document.getElementById('prank-msg');
+
+            if (jumpCount < 5) {
+                el.style.position = 'fixed';
+                el.style.top = (Math.random() * 60 + 20) + '%';
+                el.style.left = (Math.random() * 60 + 20) + '%';
+                jumpCount++;
+                speakHumanPanda("Whoosh! Too fast for you! Catch me! 🐾");
+            } else if (jumpCount === 5) {
+                jumpCount++;
+                msg.innerText = "Glitching out... Okay okay, I'll hold still! 😵";
+                let chaos = setInterval(() => {
+                    el.style.position = 'fixed';
+                    el.style.top = (Math.random() * 60 + 20) + '%';
+                    el.style.left = (Math.random() * 60 + 20) + '%';
+                    el.style.opacity = (el.style.opacity === '0' ? '1' : '0');
+                }, 100);
+
+                setTimeout(() => {
+                    clearInterval(chaos);
+                    prankFinished = true;
+                    el.style.position = 'relative';
+                    el.style.top = '0'; el.style.left = '0'; el.style.opacity = '1';
+                    msg.innerText = "Good job! Now check the box: 🐼";
+                    speakHumanPanda("Alright alright, you caught me! Check the box now!");
+                }, 3000);
+            }
+        }
+
+        function checkPandaStatus() {
+            if (document.getElementById('isPanda').checked && prankFinished) {
+                document.getElementById('challenge-next').disabled = false;
+                confetti({ particleCount: 30 });
+                speakHumanPanda("Verified 100% Panda! Let's proceed, my favorite human!");
+            }
+        }
+
+        /* ================= 6. Initial Quiz ================= */
+        const initialQuizData = [
+            { q: "When did we first spoke?", a: ["26/10/2023", "26 oct 2023", "26 october 2023", "26-10-2023"] },
+            { q: "What is my favorite nickname for you?", a: ["papa", "panda", "sandhupalli", "thango", "potato"] },
+            { q: "Where was our first date?", a: ["food court", "foodcourt", "pachaiyappas"] },
+            { q: "What color do I love?", a: ["lavender", "lavendor"] },
+            { q: "Finish the sentence: hmm, sollu ,aprm ____ .", a: ["villupuram"] }
+        ];
+        let iqIdx = 0;
+
+        function loadInitialQuiz() {
+            document.getElementById('iq-progress').innerText = `${iqIdx + 1} / 5`;
+            document.getElementById('iq-text').innerText = initialQuizData[iqIdx].q;
+            document.getElementById('iq-ans').value = "";
+            document.getElementById('iq-error').style.display = "none";
+            document.getElementById('iq-ans').focus();
+        }
+
+        function checkInitialQuiz() {
+            const val = document.getElementById('iq-ans').value.toLowerCase().trim();
+            if (initialQuizData[iqIdx].a.some(a => val.includes(a))) {
+                confetti({ particleCount: 30 });
+                speakHumanPanda("Aww, you remembered! That makes my heart flutter! 🥰");
+                iqIdx++;
+                if (iqIdx < 5) {
+                    loadInitialQuiz();
+                } else {
+                    showPage('roadmap');
+                }
+            } else {
+                const card = document.getElementById('iq-card');
+                card.classList.add('shake');
+                setTimeout(() => card.classList.remove('shake'), 400);
+                document.getElementById('iq-error').style.display = "block";
+                speakHumanPanda("Aiyoo, think carefully thango! You know this one!");
+            }
+        }
+
+        /* ================= 7. Roadmap & 2 Hidden Golden Keys ================= */
+        const KEY_MILESTONES = [1, 4];
+        let hasKey1 = false, hasKey2 = false, hasKey3 = false;
+
+        const journeyData = [
+            { title: "Where We Began", text: "Out of billions of places on this planet, our paths crossed right here. It was a single moment, a random spark, that quietly changed the trajectory of both our lives forever", imgs: ["https://picsum.photos/400/300?r=1", "https://picsum.photos/400/300?r=2", "https://picsum.photos/400/300?r=3"], q: "FIRST UNNA ENNA NU KOOPTEN ?", a: "KAVITHA" },
+            { title: "Where Hearts Spoke", text: "In the quiet stillness, the walls came down and we let each other truly in. We shared our deepest thoughts and fears, realizing our souls had finally found a safe place to land. On the time when you said SENDHU FACE PANNIKALAM SENTHU PATHUKALAM", imgs: ["https://picsum.photos/400/300?r=4", "https://picsum.photos/400/300?r=5", "https://picsum.photos/400/300?r=6"], q: "ORU IMPORTANT ANA DATE ?", a: "FEB 15" },
+            { title: "Where Time Stood Still", text: "The world outside completely disappeared, and hours melted into seconds. It was the moment we both realized that this wasn’t just another date—it was the beginning of us", imgs: ["https://picsum.photos/400/300?r=7", "https://picsum.photos/400/300?r=8", "https://picsum.photos/400/300?r=9"], q: "ENNA ORDER PANNOM ANNIKU (FIRST OUTING LA ?", a: "MUSHROOM" },
+            { title: "Where We Lost Track of Time", text: "Ennathan food court, fort , night la travel nu nalla memories irunthalum 2nd sem la daily pakkathu bench la irupa la athan koodave iruka mari irukum.Aprm NSS classes lam thirmba varatha nu irukum.", imgs: ["https://picsum.photos/400/300?r=10", "https://picsum.photos/400/300?r=11", "https://picsum.photos/400/300?r=12"], q: "ORU HECTARE KU EVALO SPRAY SOLUTION🤣?", a: "500L" },
+            { title: "Where Midnight Spoke", text: "Distance could never dull our connection across late-night calls and endless glowing screens. Here, under whispered 11:11 wishes, we turned late hours into our private sanctuary.", imgs: ["https://picsum.photos/400/300?r=13", "https://picsum.photos/400/300?r=14", "https://picsum.photos/400/300?r=15"], q: "ENTA BYE SOLLITU ENNA PANNUVA?", a: "INSTAGRAM REELS" },
+            { title: "Where Love Always Wins", text: "Through petty arguments, stubborn silence, and daily chaos, this is where we learn to yield. No matter how heated the day gets, every single night still ends with a soft I LOVE YOU ", imgs: ["https://picsum.photos/400/300?r=16", "https://picsum.photos/400/300?r=17", "https://picsum.photos/400/300?r=18"], q: "SORRY EPDI KEKANUM?", a: "SORRY MAMA" },
+            { title: "Where We Go Next", text: "This pin stays open to the horizon because our story doesn't end in the present. Wherever the road leads tomorrow, as long as we step forward together, that's where we belong", imgs: ["https://picsum.photos/400/300?r=19", "https://picsum.photos/400/300?r=20", "https://picsum.photos/400/300?r=21"], q: "ENTHA KELVI KETALUM SUIT AAGURA MARI ORU BATHIL ONNU SOLLUVA LA ATHU ENNATHU ?", a: "THERIYALA" }
+        ];
+
+        const mapCoordinates = [
+            { x: 65,  y: 45 },
+            { x: 285, y: 130 },
+            { x: 70,  y: 225 },
+            { x: 285, y: 320 },
+            { x: 75,  y: 415 },
+            { x: 280, y: 510 },
+            { x: 65,  y: 585 }
+        ];
+
+        let unlockedPoints = 1, jIdx = 0, imgIdx = 0;
+
+        function renderRoadmap() {
+            const container = document.getElementById('map-points-container');
+            container.innerHTML = "";
+
+            journeyData.forEach((item, index) => {
+                const isLocked = index >= unlockedPoints;
+                const isCompleted = index < unlockedPoints - 1;
+                const isActive = index === unlockedPoints - 1;
+
+                const pt = document.createElement('div');
+                pt.className = `map-point ${isLocked ? 'locked' : ''} ${isCompleted ? 'completed' : ''} ${isActive ? 'active-pulse' : ''}`;
+                pt.style.left = mapCoordinates[index].x + 'px';
+                pt.style.top = mapCoordinates[index].y + 'px';
+
+                pt.innerHTML = isLocked ? '🔒' : (isCompleted ? '🎋' : '🐾');
+                if (!isLocked) pt.onclick = () => openDetail(index);
+                container.appendChild(pt);
+            });
+
+            if (unlockedPoints > 7) {
+                document.getElementById('travel-btn').style.display = 'inline-flex';
+                speakHumanPanda("All 7 milestones unlocked! Let's go open the Treasure Box! 🎁🗝️");
+            }
+        }
+
+        function openDetail(idx) {
+            jIdx = idx; imgIdx = 0;
+            const isCompleted = jIdx < unlockedPoints - 1;
+
+            document.getElementById('j-title').innerText = journeyData[jIdx].title;
+            document.getElementById('j-text').innerText = journeyData[jIdx].text;
+            document.getElementById('j-quest').innerText = journeyData[jIdx].q;
+            document.getElementById('j-ans').value = "";
+
+            if (isCompleted) {
+                document.getElementById('j-quiz-box').style.display = 'none';
+                document.getElementById('j-unlock-btn').style.display = 'none';
+                speakHumanPanda("Here is our sweet unlocked memory!");
+            } else {
+                document.getElementById('j-quiz-box').style.display = 'block';
+                document.getElementById('j-unlock-btn').style.display = 'inline-flex';
+                speakHumanPanda("Answer the unlock riddle to advance!");
+            }
+
+            updateImage();
+            showPage('journey-detail');
+        }
+
+        function updateImage() {
+            document.getElementById('j-img').src = journeyData[jIdx].imgs[imgIdx];
+        }
+
+        function changeImage(dir) {
+            imgIdx = (imgIdx + dir + journeyData[jIdx].imgs.length) % journeyData[jIdx].imgs.length;
+            updateImage();
+        }
+
+        function downloadImage() {
+            const a = document.createElement('a');
+            a.href = journeyData[jIdx].imgs[imgIdx];
+            a.download = `memory-${jIdx + 1}.jpg`;
+            a.target = '_blank';
+            a.click();
+        }
+
+        function finishJourneyPoint() {
+            const rawUser = document.getElementById('j-ans').value.toLowerCase().trim();
+            const cleanUser = rawUser.replace(/\s+/g, '');
+            const rawCorrect = journeyData[jIdx].a.toLowerCase().trim();
+            const cleanCorrect = rawCorrect.replace(/\s+/g, '');
+
+            // Forgiving match: checks exact, no-space, or partial keyword match (e.g., 'reels' in 'instagram reels')
+            const isMatch = (cleanUser === cleanCorrect) || 
+                            rawUser.includes(rawCorrect) || 
+                            (rawCorrect.includes(rawUser) && rawUser.length >= 3);
+
+            if (isMatch) {
+                confetti({ particleCount: 40 });
+
+                if (jIdx === KEY_MILESTONES[0] && !hasKey1) {
+                    hasKey1 = true;
+                    document.getElementById('hud-key-1').classList.add('obtained');
+                    alert("🗝️ You found Golden Key #1 hidden in this memory!");
+                }
+                if (jIdx === KEY_MILESTONES[1] && !hasKey2) {
+                    hasKey2 = true;
+                    document.getElementById('hud-key-2').classList.add('obtained');
+                    alert("🗝️ You found Golden Key #2 tucked inside this memory!");
+                }
+
+                speakHumanPanda("Milestone unlocked! You are incredible!");
+                if (jIdx + 1 === unlockedPoints) unlockedPoints++;
+                showPage('roadmap');
+            } else {
+                const card = document.getElementById('detail-card');
+                card.classList.add('shake');
+                setTimeout(() => card.classList.remove('shake'), 400);
+                speakHumanPanda("Oops! Not quite! Try again, my panda!");
+            }
+        }
+
+        /* ================= 8. Treasure Chest, Camera Sign, & "Treasure is HIM" ================= */
+        let streamTrack = null;
+
+        function updateQuestHUD() {
+            if (hasKey1) document.getElementById('quest-key-1').classList.add('obtained');
+            if (hasKey2) document.getElementById('quest-key-2').classList.add('obtained');
+            if (hasKey3) {
+                const k3 = document.getElementById('quest-key-3');
+                k3.innerText = "🗝️ Key 3";
+                k3.classList.add('obtained');
+                document.getElementById('ask-panda-section').style.display = 'none';
+                document.getElementById('camera-section').style.display = 'none';
+                document.getElementById('open-box-section').style.display = 'block';
+            }
+        }
+
+        function triggerPandaKeyRequest() {
+            speakHumanPanda("I have the final golden key! But first, show me a cute love hand sign on the camera: 🫶 🫰 🤞 🤌 🤏");
+            document.getElementById('ask-panda-section').style.display = 'none';
+            document.getElementById('camera-section').style.display = 'block';
+
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+                    .then(stream => {
+                        const video = document.getElementById('webcam-video');
+                        video.srcObject = stream;
+                        streamTrack = stream.getTracks()[0];
+                    })
+                    .catch(err => {
+                        console.log("Camera access unavailable", err);
+                    });
+            }
+        }
+
+        function verifyLoveSignWithPanda() {
+            if (streamTrack) { streamTrack.stop(); streamTrack = null; }
+            speakHumanPanda("Aww, look at that sweet love sign! Verified 100%! Here is Key #3! 🗝️✨");
+            confetti({ particleCount: 50 });
+            hasKey3 = true;
+            updateQuestHUD();
+        }
+
+        function skipCameraAndGrantKey() {
+            if (streamTrack) { streamTrack.stop(); streamTrack = null; }
+            speakHumanPanda("I already know your love is genuine! Here is Golden Key #3! 🗝️✨");
+            hasKey3 = true;
+            updateQuestHUD();
+        }
+
+        function attemptOpenTreasure() {
+            if (!hasKey1 || !hasKey2 || !hasKey3) {
+                alert("You need all 3 Golden Keys to open the treasure chest!");
+            } else {
+                openTreasureChest();
+            }
+        }
+
+        function openTreasureChest() {
+            confetti({ particleCount: 120, spread: 100 });
+            document.getElementById('chest-closed-view').style.display = 'none';
+            document.getElementById('chest-opened-view').style.display = 'block';
+            speakHumanPanda("The greatest treasure in the entire universe... is HIM! 💙");
+        }
+
+        /* ================= 9. Proposal 5-Second Hold ================= */
+        let holdTimer, holdValue = 0;
+
+        function startHold(e) {
+            if (e && e.type === 'touchstart') e.preventDefault();
+            holdValue = 0;
+            speakHumanPanda("Hold my hand tight! Don't let go!");
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            holdTimer = setInterval(() => {
+                holdValue += 2;
+                const offset = 377 - (377 * (holdValue / 100));
+                document.getElementById('hold-progress').style.strokeDashoffset = offset;
+
+                if (holdValue >= 100) {
+                    clearInterval(holdTimer);
+                    completeProposalHold();
+                }
+            }, 100);
+        }
+
+        function endHold() {
+            if (holdValue < 100) {
+                clearInterval(holdTimer);
+                holdValue = 0;
+                document.getElementById('hold-progress').style.strokeDashoffset = 377;
+            }
+        }
+
+        function completeProposalHold() {
+            confetti({ particleCount: 100, spread: 80 });
+            if (navigator.vibrate) navigator.vibrate([100, 50, 150]);
+            document.getElementById('hold-container').style.display = 'none';
+            document.getElementById('hold-text').style.display = 'none';
+            document.getElementById('agreement-msg').style.display = 'block';
+            speakHumanPanda("You agreed! You have my whole heart for my whole life!");
+        }
+
+        /* ================= 10. Final Kiss Sequence ================= */
+        function startFinalSequence() {
+            showPage('final');
+            speakHumanPanda("Come closer now... closer...");
+            const wrap = document.getElementById('final-actor-wrap');
+            const text = document.getElementById('final-text');
+            const face = document.getElementById('actor-face');
+            const blushL = document.getElementById('blush-l');
+            const blushR = document.getElementById('blush-r');
+
+            const frames = [
+                { t: "Come closer...", s: 1.5, e: "👦" },
+                { t: "Still closer...", s: 3, e: "👦" },
+                { t: "Still closer...", s: 6, e: "👦" },
+                { t: "💋", s: 12, e: "😘" }
+            ];
+
+            frames.forEach((f, i) => {
+                setTimeout(() => {
+                    text.innerText = f.t;
+                    wrap.style.transform = `scale(${f.s})`;
+
+                    if (f.s === 3) {
+                        blushL.setAttribute('opacity', '0.6');
+                        blushR.setAttribute('opacity', '0.6');
+                    } else if (f.s === 6) {
+                        blushL.setAttribute('opacity', '0.8');
+                        blushR.setAttribute('opacity', '0.8');
+                        face.innerHTML = `
+                            <path d="M 36,58 Q 42,52 48,58" fill="none" stroke="#2d3436" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M 72,58 Q 78,52 84,58" fill="none" stroke="#2d3436" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M 54,76 Q 60,80 66,76" fill="none" stroke="#2d3436" stroke-width="3" stroke-linecap="round"/>
+                        `;
+                    } else if (f.e === "😘") {
+                        blushL.setAttribute('opacity', '1');
+                        blushR.setAttribute('opacity', '1');
+                        face.innerHTML = `
+                            <path d="M 36,58 Q 42,52 48,58" fill="none" stroke="#2d3436" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M 72,58 Q 78,52 84,58" fill="none" stroke="#2d3436" stroke-width="3" stroke-linecap="round"/>
+                            <circle cx="60" cy="74" r="5" fill="#ff7675"/>
+                        `;
+                        spawnBubbles();
+                        document.body.style.backgroundColor = "#ffb6c1";
+                        confetti({ particleCount: 120, spread: 100 });
+                        speakHumanPanda("Ummah! Happy Birthday Panda! I love you forever!");
+                    }
+                }, i * 2000);
+            });
+        }
+
+        function spawnBubbles() {
+            const emojis = ['💙', '❤️', '😍', '😘', '💕'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const b = document.createElement('div');
+                    b.style = `position:fixed; pointer-events:none; left:${Math.random()*90}vw; top:90vh; font-size:${Math.random()*26+20}px; animation:floatUp 3s forwards; z-index:999;`;
+                    b.innerText = emojis[Math.floor(Math.random()*emojis.length)];
+                    document.body.appendChild(b);
+                    setTimeout(() => b.remove(), 3200);
+                }, i * 100);
+            }
+        }
+
+        // Initialize 3D world and run the Lock Gate check immediately
+        window.addEventListener('DOMContentLoaded', () => {
+            init3DWorld();
+            checkBirthdayLock();
+        });
+    </script>
+
+    <style>
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-100vh); opacity: 0; }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</body>
+</html>
